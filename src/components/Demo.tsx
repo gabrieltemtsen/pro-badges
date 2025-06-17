@@ -3,9 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { signIn, signOut, getCsrfToken } from "next-auth/react";
-import sdk, {
-  SignIn as SignInCore,
-} from "@farcaster/frame-sdk";
+import sdk, { SignIn as SignInCore } from "@farcaster/frame-sdk";
 import {
   useAccount,
   useSendTransaction,
@@ -17,13 +15,7 @@ import {
   useSwitchChain,
   useChainId,
 } from "wagmi";
-import {
-  useConnection as useSolanaConnection,
-  useWallet as useSolanaWallet,
-} from '@solana/wallet-adapter-react';
-import { useHasSolanaProvider } from "./providers/SafeFarcasterSolanaProvider";
 import { ShareButton } from "./ui/Share";
-
 import { config } from "~/components/providers/WagmiProvider";
 import { Button } from "~/components/ui/Button";
 import { truncateAddress } from "~/lib/truncateAddress";
@@ -31,10 +23,26 @@ import { base, degen, mainnet, optimism, unichain } from "wagmi/chains";
 import { BaseError, UserRejectedRequestError } from "viem";
 import { useSession } from "next-auth/react";
 import { useMiniApp } from "@neynar/react";
-import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import { Header } from "~/components/ui/Header";
 import { Footer } from "~/components/ui/Footer";
 import { USE_WALLET, APP_NAME } from "~/lib/constants";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { 
+  Minus, 
+  Plus, 
+  Zap, 
+  Users, 
+  Clock, 
+  Star,
+  Wallet,
+  Shield,
+  Sparkles
+} from 'lucide-react';
 
 export type Tab = 'home' | 'actions' | 'context' | 'wallet';
 
@@ -44,7 +52,7 @@ interface NeynarUser {
 }
 
 export default function Demo(
-  { title }: { title?: string } = { title: "Frames v2 Demo" }
+  { title }: { title?: string } = { title: "Pro Badges Mint" }
 ) {
   const {
     isSDKLoaded,
@@ -59,20 +67,23 @@ export default function Demo(
   const [sendNotificationResult, setSendNotificationResult] = useState("");
   const [copied, setCopied] = useState(false);
   const [neynarUser, setNeynarUser] = useState<NeynarUser | null>(null);
+  const [mintAmount, setMintAmount] = useState(1);
+  const [totalMinted, setTotalMinted] = useState(0);
+  const [maxSupply] = useState(1000); // Total supply of Pro Badges
+  const [mintPrice] = useState(0.01); // Price per badge in ETH
+
+   const [quantity, setQuantity] = useState(1);
+  const [isMinting, setIsMinting] = useState(false);
+  const [mintProgress, setMintProgress] = useState(0);
+
+  const maxQuantity = 10;
+  const pricePerNFT = 0.08;
+  const totalSupply = 8888;
+  const mintedCount = 6420;
+  const progressPercentage = (mintedCount / totalSupply) * 100;
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const hasSolanaProvider = useHasSolanaProvider();
-  const solanaWallet = useSolanaWallet();
-  const { publicKey: solanaPublicKey } = solanaWallet;
-
-  useEffect(() => {
-    console.log("isSDKLoaded", isSDKLoaded);
-    console.log("context", context);
-    console.log("address", address);
-    console.log("isConnected", isConnected);
-    console.log("chainId", chainId);
-  }, [context, address, isConnected, chainId, isSDKLoaded]);
 
   // Fetch Neynar user object when context is available
   useEffect(() => {
@@ -93,6 +104,31 @@ export default function Demo(
     fetchNeynarUserObject();
   }, [context?.user?.fid]);
 
+
+  // Mock function to fetch total minted - replace with actual contract call
+  useEffect(() => {
+    const fetchTotalMinted = async () => {
+      // In production, call your contract here:
+      // const total = await contract.totalMinted();
+      // setTotalMinted(total);
+      setTotalMinted(423); // Mock data
+    };
+    
+    fetchTotalMinted();
+  }, []);
+
+  const incrementMintAmount = () => {
+    if (mintAmount < 10) { // Max 10 per transaction
+      setMintAmount(mintAmount + 1);
+    }
+  };
+
+  const decrementMintAmount = () => {
+    if (mintAmount > 1) {
+      setMintAmount(mintAmount - 1);
+    }
+  };
+
   const {
     sendTransaction,
     error: sendTxError,
@@ -105,418 +141,258 @@ export default function Demo(
       hash: txHash as `0x${string}`,
     });
 
-  const {
-    signTypedData,
-    error: signTypedError,
-    isError: isSignTypedError,
-    isPending: isSignTypedPending,
-  } = useSignTypedData();
+  // const handleMint = useCallback(() => {
+  //   if (!isConnected || totalMinted >= maxSupply) return;
 
-  const { disconnect } = useDisconnect();
-  const { connect, connectors } = useConnect();
+  //   sendTransaction(
+  //     {
+  //       // Replace with your actual contract address
+  //       to: "0x4bBFD120d9f352A0BEd7a014bd67913a2007a878",
+  //       // This is example data for a mint function - replace with your actual ABI
+  //       data: `0x1249c58b${mintAmount.toString(16).padStart(64, '0')}`,
+  //       value: BigInt(Math.floor(mintPrice * 1e18 * mintAmount)),
+  //     },
+  //     {
+  //       onSuccess: (hash) => {
+  //         setTxHash(hash);
+  //         // Update total minted after successful transaction
+  //         setTotalMinted(prev => prev + mintAmount);
+  //       },
+  //     }
+  //   );
+  // }, [sendTransaction, mintAmount, isConnected, totalMinted, maxSupply, mintPrice]);
 
-  const {
-    switchChain,
-    error: switchChainError,
-    isError: isSwitchChainError,
-    isPending: isSwitchChainPending,
-  } = useSwitchChain();
-
-  const nextChain = useMemo(() => {
-    if (chainId === base.id) {
-      return optimism;
-    } else if (chainId === optimism.id) {
-      return degen;
-    } else if (chainId === degen.id) {
-      return mainnet;
-    } else if (chainId === mainnet.id) {
-      return unichain;
-    } else {
-      return base;
+const handleQuantityChange = (newQuantity: number) => {
+    if (newQuantity >= 1 && newQuantity <= maxQuantity) {
+      setQuantity(newQuantity);
     }
-  }, [chainId]);
+  };
 
-  const handleSwitchChain = useCallback(() => {
-    switchChain({ chainId: nextChain.id });
-  }, [switchChain, nextChain.id]);
-
-  const sendNotification = useCallback(async () => {
-    setSendNotificationResult("");
-    if (!notificationDetails || !context) {
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/send-notification", {
-        method: "POST",
-        mode: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fid: context.user.fid,
-          notificationDetails,
-        }),
+  const handleMint = async () => {
+    setIsMinting(true);
+    setMintProgress(0);
+    
+    // Simulate minting progress
+    const interval = setInterval(() => {
+      setMintProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsMinting(false);
+          return 100;
+        }
+        return prev + 10;
       });
-
-      if (response.status === 200) {
-        setSendNotificationResult("Success");
-        return;
-      } else if (response.status === 429) {
-        setSendNotificationResult("Rate limited");
-        return;
-      }
-
-      const data = await response.text();
-      setSendNotificationResult(`Error: ${data}`);
-    } catch (error) {
-      setSendNotificationResult(`Error: ${error}`);
-    }
-  }, [context, notificationDetails]);
-
-  const sendTx = useCallback(() => {
-    sendTransaction(
-      {
-        // call yoink() on Yoink contract
-        to: "0x4bBFD120d9f352A0BEd7a014bd67913a2007a878",
-        data: "0x9846cd9efc000023c0",
-      },
-      {
-        onSuccess: (hash) => {
-          setTxHash(hash);
-        },
-      }
-    );
-  }, [sendTransaction]);
-
-  const signTyped = useCallback(() => {
-    signTypedData({
-      domain: {
-        name: APP_NAME,
-        version: "1",
-        chainId,
-      },
-      types: {
-        Message: [{ name: "content", type: "string" }],
-      },
-      message: {
-        content: `Hello from ${APP_NAME}!`,
-      },
-      primaryType: "Message",
-    });
-  }, [chainId, signTypedData]);
-
-  const toggleContext = useCallback(() => {
-    setIsContextOpen((prev) => !prev);
-  }, []);
-
-  if (!isSDKLoaded) {
-    return <div>Loading...</div>;
-  }
-
-  return (
-    <div
-      style={{
-        paddingTop: context?.client.safeAreaInsets?.top ?? 0,
-        paddingBottom: context?.client.safeAreaInsets?.bottom ?? 0,
-        paddingLeft: context?.client.safeAreaInsets?.left ?? 0,
-        paddingRight: context?.client.safeAreaInsets?.right ?? 0,
-      }}
-    >
-      <div className="mx-auto py-2 px-4 pb-20">
-        <Header neynarUser={neynarUser} />
-
-        <h1 className="text-2xl font-bold text-center mb-4">{title}</h1>
-
-        {activeTab === 'home' && (
-          <div className="flex items-center justify-center h-[calc(100vh-200px)] px-6">
-            <div className="text-center w-full max-w-md mx-auto">
-              <p className="text-lg mb-2">Put your content here!</p>
-              <p className="text-sm text-gray-500">Powered by Neynar 🪐</p>
-            </div>
+    }, 200);
+  };
+   return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-400/20 via-transparent to-transparent"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+      
+      <div className="relative z-10 container mx-auto px-4 py-8">
+        {/* Header */}
+        <header className="text-center mb-12">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Sparkles className="w-8 h-8 text-purple-400" />
+            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+              CryptoBeasts
+            </h1>
+            <Sparkles className="w-8 h-8 text-purple-400" />
           </div>
-        )}
+          <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+            Discover unique digital creatures in the metaverse. Each NFT is procedurally generated with rare traits and special abilities.
+          </p>
+          <Badge variant="secondary" className="mt-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
+            <Zap className="w-4 h-4 mr-1" />
+            Live Mint
+          </Badge>
+        </header>
 
-        {activeTab === 'actions' && (
-          <div className="space-y-3 px-6 w-full max-w-md mx-auto">
-            <ShareButton 
-              buttonText="Share Mini App"
-              cast={{
-                text: "Check out this awesome frame @1 @2 @3! 🚀🪐",
-                bestFriends: true,
-                embeds: [`${process.env.NEXT_PUBLIC_URL}/share/${context?.user?.fid || ''}`]
-              }}
-              className="w-full"
-            />
-
-            <SignIn />
-
-            <Button onClick={() => actions.openUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")} className="w-full">Open Link</Button>
-
-            <Button onClick={actions.close} className="w-full">Close Mini App</Button>
-
-            <Button onClick={actions.addMiniApp} disabled={added} className="w-full">
-              Add Mini App to Client
-            </Button>
-
-            {sendNotificationResult && (
-              <div className="text-sm w-full">
-                Send notification result: {sendNotificationResult}
-              </div>
-            )}
-            <Button onClick={sendNotification} disabled={!notificationDetails} className="w-full">
-              Send notification
-            </Button>
-
-            <Button 
-              onClick={async () => {
-                if (context?.user?.fid) {
-                  const shareUrl = `${process.env.NEXT_PUBLIC_URL}/share/${context.user.fid}`;
-                  await navigator.clipboard.writeText(shareUrl);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }
-              }}
-              disabled={!context?.user?.fid}
-              className="w-full"
-            >
-              {copied ? "Copied!" : "Copy share URL"}
-            </Button>
-          </div>
-        )}
-
-        {activeTab === 'context' && (
-          <div className="mx-6">
-            <h2 className="text-lg font-semibold mb-2">Context</h2>
-            <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
-              <pre className="font-mono text-xs whitespace-pre-wrap break-words w-full">
-                {JSON.stringify(context, null, 2)}
-              </pre>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'wallet' && USE_WALLET && (
-          <div className="space-y-3 px-6 w-full max-w-md mx-auto">
-            {address && (
-              <div className="text-xs w-full">
-                Address: <pre className="inline w-full">{truncateAddress(address)}</pre>
-              </div>
-            )}
-
-            {chainId && (
-              <div className="text-xs w-full">
-                Chain ID: <pre className="inline w-full">{chainId}</pre>
-              </div>
-            )}
-
-            {isConnected ? (
-              <Button
-                onClick={() => disconnect()}
-                className="w-full"
-              >
-                Disconnect
-              </Button>
-            ) : context ? (
-              <Button
-                onClick={() => connect({ connector: connectors[0] })}
-                className="w-full"
-              >
-                Connect
-              </Button>
-            ) : (
-              <div className="space-y-3 w-full">
-                <Button
-                  onClick={() => connect({ connector: connectors[1] })}
-                  className="w-full"
-                >
-                  Connect Coinbase Wallet
-                </Button>
-                <Button
-                  onClick={() => connect({ connector: connectors[2] })}
-                  className="w-full"
-                >
-                  Connect MetaMask
-                </Button>
-              </div>
-            )}
-
-            <SignEvmMessage />
-
-            {isConnected && (
-              <>
-                <SendEth />
-                <Button
-                  onClick={sendTx}
-                  disabled={!isConnected || isSendTxPending}
-                  isLoading={isSendTxPending}
-                  className="w-full"
-                >
-                  Send Transaction (contract)
-                </Button>
-                {isSendTxError && renderError(sendTxError)}
-                {txHash && (
-                  <div className="text-xs w-full">
-                    <div>Hash: {truncateAddress(txHash)}</div>
-                    <div>
-                      Status:{" "}
-                      {isConfirming
-                        ? "Confirming..."
-                        : isConfirmed
-                        ? "Confirmed!"
-                        : "Pending"}
+        {/* Main Content */}
+        <div className="grid lg:grid-cols-2 gap-12 items-center max-w-7xl mx-auto">
+          {/* NFT Preview */}
+          <div className="space-y-6">
+            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm overflow-hidden group hover:scale-105 transition-transform duration-500">
+              <CardContent className="p-0">
+                <div className="aspect-square bg-gradient-to-br from-purple-600 via-pink-500 to-blue-500 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-black/20"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-64 h-64 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center animate-pulse">
+                      <Sparkles className="w-24 h-24 text-white/70" />
                     </div>
                   </div>
-                )}
-                <Button
-                  onClick={signTyped}
-                  disabled={!isConnected || isSignTypedPending}
-                  isLoading={isSignTypedPending}
-                  className="w-full"
-                >
-                  Sign Typed Data
-                </Button>
-                {isSignTypedError && renderError(signTypedError)}
-                <Button
-                  onClick={handleSwitchChain}
-                  disabled={isSwitchChainPending}
-                  isLoading={isSwitchChainPending}
-                  className="w-full"
-                >
-                  Switch to {nextChain.name}
-                </Button>
-                {isSwitchChainError && renderError(switchChainError)}
-              </>
-            )}
-          </div>
-        )}
+                  <div className="absolute top-4 left-4">
+                    <Badge className="bg-black/50 text-white border-white/20">
+                      #6421
+                    </Badge>
+                  </div>
+                  <div className="absolute top-4 right-4">
+                    <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
+                      <Star className="w-3 h-3 mr-1" />
+                      Legendary
+                    </Badge>
+                  </div>
+                </div>
+                <div className="p-6 bg-gradient-to-t from-slate-900/90 to-transparent">
+                  <h3 className="text-2xl font-bold text-white mb-2">Mystical Beast #6421</h3>
+                  <p className="text-slate-300">
+                    A rare creature with elemental fire powers and ethereal wings. This beast has conquered multiple realms.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Footer activeTab={activeTab} setActiveTab={setActiveTab} showWallet={USE_WALLET} />
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+                <CardContent className="p-4 text-center">
+                  <Users className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-white">{mintedCount.toLocaleString()}</div>
+                  <div className="text-sm text-slate-400">Minted</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+                <CardContent className="p-4 text-center">
+                  <Shield className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-white">{totalSupply.toLocaleString()}</div>
+                  <div className="text-sm text-slate-400">Total Supply</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+                <CardContent className="p-4 text-center">
+                  <Clock className="w-6 h-6 text-green-400 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-white">{pricePerNFT}</div>
+                  <div className="text-sm text-slate-400">ETH Each</div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Minting Panel */}
+          <div className="space-y-6">
+            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm">
+              <CardContent className="p-8">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold text-white mb-2">Mint Your Beast</h2>
+                  <p className="text-slate-300">Choose quantity and mint your NFTs</p>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-8">
+                  <div className="flex justify-between text-sm text-slate-300 mb-2">
+                    <span>Minting Progress</span>
+                    <span>{mintedCount}/{totalSupply}</span>
+                  </div>
+                  <Progress value={progressPercentage} className="h-3 bg-slate-700" />
+                  <div className="text-center text-xs text-slate-400 mt-1">
+                    {(100 - progressPercentage).toFixed(1)}% remaining
+                  </div>
+                </div>
+
+                <Separator className="bg-slate-700/50 mb-8" />
+
+                {/* Quantity Selector */}
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-3">
+                      Quantity (Max {maxQuantity})
+                    </label>
+                    <div className="flex items-center justify-center gap-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleQuantityChange(quantity - 1)}
+                        disabled={quantity <= 1}
+                        className="w-12 h-12 rounded-full border-slate-600 hover:border-purple-500 transition-colors"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </Button>
+                      <div className="text-4xl font-bold text-white w-16 text-center">
+                        {quantity}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleQuantityChange(quantity + 1)}
+                        disabled={quantity >= maxQuantity}
+                        className="w-12 h-12 rounded-full border-slate-600 hover:border-purple-500 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Price Calculation */}
+                  <Card className="bg-slate-700/30 border-slate-600/50">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-300">Total Price</span>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-white">
+                            {(pricePerNFT * quantity).toFixed(3)} ETH
+                          </div>
+                          <div className="text-sm text-slate-400">
+                            ~${(pricePerNFT * quantity * 2000).toFixed(0)} USD
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Mint Progress */}
+                  {isMinting && (
+                    <Card className="bg-purple-500/10 border-purple-500/30">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Zap className="w-5 h-5 text-purple-400 animate-pulse" />
+                          <span className="text-purple-300 font-medium">Minting in progress...</span>
+                        </div>
+                        <Progress value={mintProgress} className="h-2 bg-purple-900/50" />
+                        <div className="text-xs text-purple-300 mt-1">{mintProgress}% Complete</div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Mint Button */}
+                  <Button
+                    onClick={handleMint}
+                    disabled={isMinting}
+                    className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-purple-500/25"
+                  >
+                    <Wallet className="w-5 h-5 mr-2" />
+                    {isMinting ? 'Minting...' : `Mint ${quantity} NFT${quantity > 1 ? 's' : ''}`}
+                  </Button>
+
+                  <div className="text-center text-sm text-slate-400">
+                    By minting, you agree to our terms of service
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Features */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+                <CardContent className="p-4 text-center">
+                  <Shield className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                  <div className="font-semibold text-white">Secure</div>
+                  <div className="text-xs text-slate-400">Verified Smart Contract</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+                <CardContent className="p-4 text-center">
+                  <Sparkles className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                  <div className="font-semibold text-white">Unique</div>
+                  <div className="text-xs text-slate-400">Rare Attributes</div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  );
-}
-
-// Solana functions inspired by farcaster demo
-// https://github.com/farcasterxyz/frames-v2-demo/blob/main/src/components/Demo.tsx
-function SignSolanaMessage({ signMessage }: { signMessage?: (message: Uint8Array) => Promise<Uint8Array> }) {
-  const [signature, setSignature] = useState<string | undefined>();
-  const [signError, setSignError] = useState<Error | undefined>();
-  const [signPending, setSignPending] = useState(false);
-
-  const handleSignMessage = useCallback(async () => {
-    setSignPending(true);
-    try {
-      if (!signMessage) {
-        throw new Error('no Solana signMessage');
-      }
-      const input = new TextEncoder().encode("Hello from Solana!");
-      const signatureBytes = await signMessage(input);
-      const signature = btoa(String.fromCharCode(...signatureBytes));
-      setSignature(signature);
-      setSignError(undefined);
-    } catch (e) {
-      if (e instanceof Error) {
-        setSignError(e);
-      }
-    } finally {
-      setSignPending(false);
-    }
-  }, [signMessage]);
-
-  return (
-    <>
-      <Button
-        onClick={handleSignMessage}
-        disabled={signPending}
-        isLoading={signPending}
-        className="mb-4"
-      >
-        Sign Message
-      </Button>
-      {signError && renderError(signError)}
-      {signature && (
-        <div className="mt-2 text-xs">
-          <div>Signature: {signature}</div>
-        </div>
-      )}
-    </>
-  );
-}
-
-function SendSolana() {
-  const [state, setState] = useState<
-    | { status: 'none' }
-    | { status: 'pending' }
-    | { status: 'error'; error: Error }
-    | { status: 'success'; signature: string }
-  >({ status: 'none' });
-
-  const { connection: solanaConnection } = useSolanaConnection();
-  const { sendTransaction, publicKey } = useSolanaWallet();
-
-  // This should be replaced but including it from the original demo
-  // https://github.com/farcasterxyz/frames-v2-demo/blob/main/src/components/Demo.tsx#L718
-  const ashoatsPhantomSolanaWallet = 'Ao3gLNZAsbrmnusWVqQCPMrcqNi6jdYgu8T6NCoXXQu1';
-
-  const handleSend = useCallback(async () => {
-    setState({ status: 'pending' });
-    try {
-      if (!publicKey) {
-        throw new Error('no Solana publicKey');
-      }
-
-      const { blockhash } = await solanaConnection.getLatestBlockhash();
-      if (!blockhash) {
-        throw new Error('failed to fetch latest Solana blockhash');
-      }
-
-      const fromPubkeyStr = publicKey.toBase58();
-      const toPubkeyStr = ashoatsPhantomSolanaWallet;
-      const transaction = new Transaction();
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: new PublicKey(fromPubkeyStr),
-          toPubkey: new PublicKey(toPubkeyStr),
-          lamports: 0n,
-        }),
-      );
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = new PublicKey(fromPubkeyStr);
-
-      const simulation = await solanaConnection.simulateTransaction(transaction);
-      if (simulation.value.err) {
-        // Gather logs and error details for debugging
-        const logs = simulation.value.logs?.join('\n') ?? 'No logs';
-        const errDetail = JSON.stringify(simulation.value.err);
-        throw new Error(`Simulation failed: ${errDetail}\nLogs:\n${logs}`);
-      }
-      const signature = await sendTransaction(transaction, solanaConnection);
-      setState({ status: 'success', signature });
-    } catch (e) {
-      if (e instanceof Error) {
-        setState({ status: 'error', error: e });
-      } else {
-        setState({ status: 'none' });
-      }
-    }
-  }, [sendTransaction, publicKey, solanaConnection]);
-
-  return (
-    <>
-      <Button
-        onClick={handleSend}
-        disabled={state.status === 'pending'}
-        isLoading={state.status === 'pending'}
-        className="mb-4"
-      >
-        Send Transaction (sol)
-      </Button>
-      {state.status === 'error' && renderError(state.error)}
-      {state.status === 'success' && (
-        <div className="mt-2 text-xs">
-          <div>Hash: {truncateAddress(state.signature)}</div>
-        </div>
-      )}
-    </>
   );
 }
 
@@ -539,7 +415,7 @@ function SignEvmMessage() {
       });
     }
 
-    signMessage({ message: "Hello from Frames v2!" });
+    signMessage({ message: "Hello from Pro Badges!" });
   }, [connectAsync, isConnected, signMessage]);
 
   return (
@@ -717,4 +593,3 @@ const renderError = (error: Error | null) => {
 
   return <div className="text-red-500 text-xs mt-1">{error.message}</div>;
 };
-

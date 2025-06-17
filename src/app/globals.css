@@ -34,3 +34,22 @@ body {
     --radius: 0.5rem;
   }
 }
+.button-primary {
+  @apply bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-purple-500/25 hover:scale-[1.02];
+}
+
+.button-outline {
+  @apply bg-transparent border border-slate-600 hover:border-purple-500 text-white font-medium py-2 px-4 rounded-full transition-colors;
+}
+
+.button-small {
+  @apply py-2 px-3 text-sm;
+}
+
+.button-medium {
+  @apply py-2.5 px-4 text-base;
+}
+
+.button-large {
+  @apply py-3 px-6 text-lg;
+}

@@ -292,23 +292,23 @@ export default function Demo(
                       Quantity (Max 10)
                     </label>
                     <div className="flex items-center justify-center gap-2 sm:gap-4">
-                      <Button
+                      <button
                         onClick={decrementMintAmount}
                         disabled={mintAmount <= 1}
-                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-slate-600 hover:border-purple-500 transition-colors"
+                        className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-600 hover:border-purple-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
-                      </Button>
+                      </button>
                       <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-white w-12 sm:w-16 text-center">
                         {mintAmount}
                       </div>
-                      <Button
+                     <button
                         onClick={incrementMintAmount}
                         disabled={mintAmount >= 10}
-                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-slate-600 hover:border-purple-500 transition-colors"
+                        className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-600 hover:border-purple-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                      </Button>
+                      </button>
                     </div>
                   </div>
 
@@ -356,17 +356,17 @@ export default function Demo(
                   )}
 
                   {/* Mint Button */}
-                  <Button
+                 <button
                     onClick={handleMint}
                     disabled={isMinting || isConfirming || totalMinted >= maxSupply}
-                    className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-[1.02] shadow-lg hover:shadow-purple-500/25"
+                    className="w-full h-12 sm:h-14 flex items-center justify-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-base sm:text-lg font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-purple-500/25 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
                   >
                     <Wallet className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                     {!isConnected ? 'Connect Wallet' : 
-                     isMinting ? 'Minting...' : 
-                     isConfirming ? 'Confirming...' : 
-                     `Mint ${mintAmount} NFT${mintAmount > 1 ? 's' : ''}`}
-                  </Button>
+                    isMinting ? 'Minting...' : 
+                    isConfirming ? 'Confirming...' : 
+                    `Mint ${mintAmount} NFT${mintAmount > 1 ? 's' : ''}`}
+                  </button>
 
                   <div className="text-center text-xs sm:text-sm text-slate-400">
                     By minting, you agree to our terms of service

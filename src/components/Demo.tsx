@@ -8,7 +8,7 @@ import { signIn, signOut, getCsrfToken } from "next-auth/react";
 import sdk, { SignIn as SignInCore } from "@farcaster/frame-sdk";
 import {
   useAccount,
-  useSendTransaction,
+  useWriteContract,
   useSignMessage,
   useSignTypedData,
   useWaitForTransactionReceipt,
@@ -22,12 +22,12 @@ import { config } from "~/components/providers/WagmiProvider";
 import { Button } from "~/components/ui/Button";
 import { truncateAddress } from "~/lib/truncateAddress";
 import { base, degen, mainnet, optimism, unichain } from "wagmi/chains";
-import { BaseError, UserRejectedRequestError } from "viem";
+import { BaseError, UserRejectedRequestError, parseEther } from "viem";
 import { useSession } from "next-auth/react";
 import { useMiniApp } from "@neynar/react";
 import { Header } from "~/components/ui/Header";
 import { Footer } from "~/components/ui/Footer";
-import { USE_WALLET, APP_NAME } from "~/lib/constants";
+import { USE_WALLET, APP_NAME, APP_ENV, NFT_CONTRACT } from "~/lib/constants";
 import { Card, CardContent } from '~/components/ui/card';
 import { Badge } from '~/components/ui/badge';
 import { Progress } from '~/components/ui/progress';
@@ -68,7 +68,7 @@ export default function Demo(
   const [sendNotificationResult, setSendNotificationResult] = useState("");
   const [copied, setCopied] = useState(false);
   const [neynarUser, setNeynarUser] = useState<NeynarUser | null>(null);
-  const [mintAmount, setMintAmount] = useState(1);
+  const [mintAmount, setMintAmount] = useState<any>(1);
   const [totalMinted, setTotalMinted] = useState(0);
   const [maxSupply] = useState(1000);
   const [mintPrice] = useState(0.01);
@@ -90,12 +90,7 @@ export default function Demo(
     }
   }, [chainId, isConnected]);
 
-  const {
-    sendTransaction,
-    error: sendTxError,
-    isError: isSendTxError,
-    isPending: isSendTxPending,
-  } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({
@@ -144,11 +139,20 @@ export default function Demo(
         });
       }, 300);
 
-      // Example transaction - replace with your actual contract call
-      const hash: any = await sendTransaction({
-        to: "0x4bBFD120d9f352A0BEd7a014bd67913a2007a878", // Replace with your contract
-        value: BigInt(Math.floor(mintPrice * 1e18 * mintAmount)),
-        data: `0x1249c58b${mintAmount.toString(16).padStart(64, '0')}`, // Example mint function
+      const hash = await writeContractAsync({
+        address: NFT_CONTRACT  as `0x${string}`,
+        abi: [
+          {
+            inputs: [{ internalType: 'uint256', name: 'quantity', type: 'uint256' }],
+            name: 'mint',
+            outputs: [],
+            stateMutability: 'payable',
+            type: 'function',
+          },
+        ] as const,
+        functionName: 'mint',
+        args: [mintAmount],
+        value: parseEther((mintPrice * mintAmount).toString()),
       });
 
       setTxHash(hash);
@@ -159,7 +163,7 @@ export default function Demo(
     } finally {
       setIsMinting(false);
     }
-  }, [sendTransaction, mintAmount, isConnected, chainId, mintPrice]);
+  }, [writeContractAsync, mintAmount, isConnected, chainId, mintPrice]);
 
   const incrementMintAmount = () => {
     if (mintAmount < 10) {
@@ -177,13 +181,20 @@ export default function Demo(
   const progressPercentage = (totalMinted / maxSupply) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-900 to-slate-950 relative overflow-hidden">
       {/* Background Elements */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-400/20 via-transparent to-transparent"></div>
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-500/20 via-transparent to-transparent"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl"></div>
       
       <div className="relative z-10 container mx-auto px-4 py-8">
+        {APP_ENV && (
+          <div className="mb-4 text-center">
+            <span className="inline-block rounded bg-yellow-600/20 px-3 py-1 text-sm font-medium text-yellow-300">
+              {APP_ENV.toUpperCase()} MODE - This app is in beta
+            </span>
+          </div>
+        )}
         {/* Header */}
         <header className="text-center mb-8 sm:mb-12">
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -194,7 +205,7 @@ export default function Demo(
             <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400" />
           </div>
           <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto">
-            Each NFT is procedurally generated with rare traits and special abilities for pro casters.
+            Each NFT is randomly generated with traits from all the farcaster projects and communities.
           </p>
           <Badge variant="secondary" className="mt-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
             <Zap className="w-4 h-4 mr-1" />
@@ -206,7 +217,7 @@ export default function Demo(
         <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 items-center max-w-7xl mx-auto">
           {/* NFT Preview */}
           <div className="space-y-4 sm:space-y-6">
-            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm overflow-hidden group hover:scale-[1.02] transition-transform duration-500">
+            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm overflow-hidden rounded-xl group hover:scale-[1.02] transition-transform duration-500">
               <CardContent className="p-0">
                 <div className="aspect-square bg-gradient-to-br from-purple-600 via-pink-500 to-blue-500 relative overflow-hidden">
                   <div className="absolute inset-0 bg-black/20"></div>
@@ -230,7 +241,7 @@ export default function Demo(
                 <div className="p-4 sm:p-6 bg-gradient-to-t from-slate-900/90 to-transparent">
                   <h3 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">Pro Badges</h3>
                   <p className="text-sm sm:text-base text-slate-300">
-                    A unique NFT collection for pro casters, featuring rare traits and special abilities.
+                    An NFT collection to commemorate the Farcaster Pro launch. 10k supply, with all Pro users whitelisted to mint one per day until sold out.
                   </p>
                 </div>
               </CardContent>
@@ -238,21 +249,21 @@ export default function Demo(
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm rounded-md">
                 <CardContent className="p-2 sm:p-4 text-center">
                   <Users className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 mx-auto mb-1 sm:mb-2" />
                   <div className="text-lg sm:text-2xl font-bold text-white">{totalMinted.toLocaleString()}</div>
                   <div className="text-xs sm:text-sm text-slate-400">Minted</div>
                 </CardContent>
               </Card>
-              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm rounded-md">
                 <CardContent className="p-2 sm:p-4 text-center">
                   <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400 mx-auto mb-1 sm:mb-2" />
                   <div className="text-lg sm:text-2xl font-bold text-white">{maxSupply.toLocaleString()}</div>
                   <div className="text-xs sm:text-sm text-slate-400">Total Supply</div>
                 </CardContent>
               </Card>
-              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm rounded-md">
                 <CardContent className="p-2 sm:p-4 text-center">
                   <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-green-400 mx-auto mb-1 sm:mb-2" />
                   <div className="text-lg sm:text-2xl font-bold text-white">{mintPrice}</div>
@@ -264,7 +275,7 @@ export default function Demo(
 
           {/* Minting Panel */}
           <div className="space-y-4 sm:space-y-6">
-            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm">
+            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm rounded-xl">
               <CardContent className="p-4 sm:p-6 md:p-8">
                 <div className="text-center mb-4 sm:mb-6 md:mb-8">
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1 sm:mb-2">Mint Your Badge</h2>
@@ -313,7 +324,7 @@ export default function Demo(
                   </div>
 
                   {/* Price Calculation */}
-                  <Card className="bg-slate-700/30 border-slate-600/50">
+                  <Card className="bg-slate-700/30 border-slate-600/50 rounded-md">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex justify-between items-center">
                         <span className="text-xs sm:text-sm text-slate-300">Total Price</span>
@@ -377,14 +388,14 @@ export default function Demo(
 
             {/* Features */}
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
-              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm rounded-md">
                 <CardContent className="p-2 sm:p-4 text-center">
                   <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 mx-auto mb-1 sm:mb-2" />
                   <div className="text-sm sm:text-base font-semibold text-white">Secure</div>
                   <div className="text-xs text-slate-400">Verified Smart Contract</div>
                 </CardContent>
               </Card>
-              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+              <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm rounded-md">
                 <CardContent className="p-2 sm:p-4 text-center">
                   <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400 mx-auto mb-1 sm:mb-2" />
                   <div className="text-sm sm:text-base font-semibold text-white">Unique</div>
@@ -442,61 +453,6 @@ function SignEvmMessage() {
   );
 }
 
-function SendEth() {
-  const { isConnected, chainId } = useAccount();
-  const {
-    sendTransaction,
-    data,
-    error: sendTxError,
-    isError: isSendTxError,
-    isPending: isSendTxPending,
-  } = useSendTransaction();
-
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: data,
-    });
-
-  const toAddr = useMemo(() => {
-    // Protocol guild address
-    return chainId === base.id
-      ? "0x32e3C7fD24e175701A35c224f2238d18439C7dBC"
-      : "0xB3d8d7887693a9852734b4D25e9C0Bb35Ba8a830";
-  }, [chainId]);
-
-  const handleSend = useCallback(() => {
-    sendTransaction({
-      to: toAddr,
-      value: 1n,
-    });
-  }, [toAddr, sendTransaction]);
-
-  return (
-    <>
-      <Button
-        onClick={handleSend}
-        disabled={!isConnected || isSendTxPending}
-        isLoading={isSendTxPending}
-      >
-        Send Transaction (eth)
-      </Button>
-      {isSendTxError && renderError(sendTxError)}
-      {data && (
-        <div className="mt-2 text-xs">
-          <div>Hash: {truncateAddress(data)}</div>
-          <div>
-            Status:{" "}
-            {isConfirming
-              ? "Confirming..."
-              : isConfirmed
-              ? "Confirmed!"
-              : "Pending"}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
 
 function SignIn() {
   const [signingIn, setSigningIn] = useState(false);

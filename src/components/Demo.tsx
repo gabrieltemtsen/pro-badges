@@ -68,7 +68,7 @@ export default function Demo(
   const [sendNotificationResult, setSendNotificationResult] = useState("");
   const [copied, setCopied] = useState(false);
   const [neynarUser, setNeynarUser] = useState<NeynarUser | null>(null);
-  const [mintAmount, setMintAmount] = useState(1);
+  const [mintAmount, setMintAmount] = useState<any>(1);
   const [totalMinted, setTotalMinted] = useState(0);
   const [maxSupply] = useState(1000);
   const [mintPrice] = useState(0.01);

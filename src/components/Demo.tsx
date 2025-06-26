@@ -8,7 +8,7 @@ import { signIn, signOut, getCsrfToken } from "next-auth/react";
 import sdk, { SignIn as SignInCore } from "@farcaster/frame-sdk";
 import {
   useAccount,
-  useSendTransaction,
+  useWriteContract,
   useSignMessage,
   useSignTypedData,
   useWaitForTransactionReceipt,
@@ -22,12 +22,12 @@ import { config } from "~/components/providers/WagmiProvider";
 import { Button } from "~/components/ui/Button";
 import { truncateAddress } from "~/lib/truncateAddress";
 import { base, degen, mainnet, optimism, unichain } from "wagmi/chains";
-import { BaseError, UserRejectedRequestError } from "viem";
+import { BaseError, UserRejectedRequestError, parseEther } from "viem";
 import { useSession } from "next-auth/react";
 import { useMiniApp } from "@neynar/react";
 import { Header } from "~/components/ui/Header";
 import { Footer } from "~/components/ui/Footer";
-import { USE_WALLET, APP_NAME } from "~/lib/constants";
+import { USE_WALLET, APP_NAME, APP_ENV, NFT_CONTRACT } from "~/lib/constants";
 import { Card, CardContent } from '~/components/ui/card';
 import { Badge } from '~/components/ui/badge';
 import { Progress } from '~/components/ui/progress';
@@ -90,12 +90,7 @@ export default function Demo(
     }
   }, [chainId, isConnected]);
 
-  const {
-    sendTransaction,
-    error: sendTxError,
-    isError: isSendTxError,
-    isPending: isSendTxPending,
-  } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({
@@ -144,11 +139,20 @@ export default function Demo(
         });
       }, 300);
 
-      // Example transaction - replace with your actual contract call
-      const hash: any = await sendTransaction({
-        to: "0xbf2C91535e59CEF1ea24ab0E008EC9f81d11de43", // Official NFT contract
-        value: BigInt(Math.floor(mintPrice * 1e18 * mintAmount)),
-        data: `0x1249c58b${mintAmount.toString(16).padStart(64, '0')}`, // Example mint function
+      const hash = await writeContractAsync({
+        address: NFT_CONTRACT,
+        abi: [
+          {
+            inputs: [{ internalType: 'uint256', name: 'quantity', type: 'uint256' }],
+            name: 'mint',
+            outputs: [],
+            stateMutability: 'payable',
+            type: 'function',
+          },
+        ] as const,
+        functionName: 'mint',
+        args: [mintAmount],
+        value: parseEther((mintPrice * mintAmount).toString()),
       });
 
       setTxHash(hash);
@@ -159,7 +163,7 @@ export default function Demo(
     } finally {
       setIsMinting(false);
     }
-  }, [sendTransaction, mintAmount, isConnected, chainId, mintPrice]);
+  }, [writeContractAsync, mintAmount, isConnected, chainId, mintPrice]);
 
   const incrementMintAmount = () => {
     if (mintAmount < 10) {
@@ -184,6 +188,13 @@ export default function Demo(
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl"></div>
       
       <div className="relative z-10 container mx-auto px-4 py-8">
+        {APP_ENV && (
+          <div className="mb-4 text-center">
+            <span className="inline-block rounded bg-yellow-600/20 px-3 py-1 text-sm font-medium text-yellow-300">
+              {APP_ENV.toUpperCase()} MODE - This app is in beta
+            </span>
+          </div>
+        )}
         {/* Header */}
         <header className="text-center mb-8 sm:mb-12">
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -442,61 +453,6 @@ function SignEvmMessage() {
   );
 }
 
-function SendEth() {
-  const { isConnected, chainId } = useAccount();
-  const {
-    sendTransaction,
-    data,
-    error: sendTxError,
-    isError: isSendTxError,
-    isPending: isSendTxPending,
-  } = useSendTransaction();
-
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: data,
-    });
-
-  const toAddr = useMemo(() => {
-    // Protocol guild address
-    return chainId === base.id
-      ? "0x32e3C7fD24e175701A35c224f2238d18439C7dBC"
-      : "0xB3d8d7887693a9852734b4D25e9C0Bb35Ba8a830";
-  }, [chainId]);
-
-  const handleSend = useCallback(() => {
-    sendTransaction({
-      to: toAddr,
-      value: 1n,
-    });
-  }, [toAddr, sendTransaction]);
-
-  return (
-    <>
-      <Button
-        onClick={handleSend}
-        disabled={!isConnected || isSendTxPending}
-        isLoading={isSendTxPending}
-      >
-        Send Transaction (eth)
-      </Button>
-      {isSendTxError && renderError(sendTxError)}
-      {data && (
-        <div className="mt-2 text-xs">
-          <div>Hash: {truncateAddress(data)}</div>
-          <div>
-            Status:{" "}
-            {isConfirming
-              ? "Confirming..."
-              : isConfirmed
-              ? "Confirmed!"
-              : "Pending"}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
 
 function SignIn() {
   const [signingIn, setSigningIn] = useState(false);

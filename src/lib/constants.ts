@@ -13,3 +13,6 @@ export const APP_WEBHOOK_URL = process.env.NEYNAR_API_KEY && process.env.NEYNAR_
     : `${APP_URL}/api/webhook`;
 export const USE_WALLET = process.env.NEXT_PUBLIC_USE_WALLET === 'true';
 export const APP_ENV = process.env.NEXT_PUBLIC_APP_ENV ?? 'testing';
+export const NFT_CONTRACT =
+  process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS ??
+  '0xbf2C91535e59CEF1ea24ab0E008EC9f81d11de43';

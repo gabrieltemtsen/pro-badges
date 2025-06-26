@@ -27,7 +27,8 @@ import { useSession } from "next-auth/react";
 import { useMiniApp } from "@neynar/react";
 import { Header } from "~/components/ui/Header";
 import { Footer } from "~/components/ui/Footer";
-import { USE_WALLET, APP_NAME, APP_ENV, NFT_CONTRACT } from "~/lib/constants";
+import { USE_WALLET, APP_NAME, APP_ENV, NFT_CONTRACT, NFT_CONTRACT_ABI } from "~/lib/constants";
+import { readContract } from "wagmi/actions";
 import { Card, CardContent } from '~/components/ui/card';
 import { Badge } from '~/components/ui/badge';
 import { Progress } from '~/components/ui/progress';
@@ -75,6 +76,8 @@ export default function Demo(
   const [isMinting, setIsMinting] = useState(false);
   const [mintProgress, setMintProgress] = useState(0);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [tokenImage, setTokenImage] = useState<string | null>(null);
+  const [tokenId, setTokenId] = useState<number | null>(null);
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -96,6 +99,33 @@ export default function Demo(
     useWaitForTransactionReceipt({
       hash: txHash as `0x${string}`,
     });
+
+  useEffect(() => {
+    if (!isConfirmed) return;
+    const fetchData = async () => {
+      try {
+        const supply = (await readContract(config, {
+          address: NFT_CONTRACT as `0x${string}`,
+          abi: NFT_CONTRACT_ABI,
+          functionName: 'totalSupply',
+        })) as bigint;
+        const id = Number(supply);
+        setTokenId(id);
+        const uri = (await readContract(config, {
+          address: NFT_CONTRACT as `0x${string}`,
+          abi: NFT_CONTRACT_ABI,
+          functionName: 'tokenURI',
+          args: [BigInt(id)],
+        })) as string;
+        const res = await fetch(uri);
+        const meta = await res.json();
+        setTokenImage(meta.image || meta.image_url);
+      } catch (err) {
+        console.error('Failed to fetch token data', err);
+      }
+    };
+    fetchData();
+  }, [isConfirmed]);
 
   const handleSwitchToBase = async () => {
     try {
@@ -140,16 +170,8 @@ export default function Demo(
       }, 300);
 
       const hash = await writeContractAsync({
-        address: NFT_CONTRACT  as `0x${string}`,
-        abi: [
-          {
-            inputs: [{ internalType: 'uint256', name: 'quantity', type: 'uint256' }],
-            name: 'mint',
-            outputs: [],
-            stateMutability: 'payable',
-            type: 'function',
-          },
-        ] as const,
+        address: NFT_CONTRACT as `0x${string}`,
+        abi: NFT_CONTRACT_ABI,
         functionName: 'mint',
         args: [mintAmount],
         value: parseEther((mintPrice * mintAmount).toString()),
@@ -221,14 +243,18 @@ export default function Demo(
               <CardContent className="p-0">
                 <div className="aspect-square bg-gradient-to-br from-purple-600 via-pink-500 to-blue-500 relative overflow-hidden">
                   <div className="absolute inset-0 bg-black/20"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-48 h-48 sm:w-64 sm:h-64 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center animate-pulse">
-                      <Sparkles className="w-16 h-16 sm:w-24 sm:h-24 text-white/70" />
+                  {tokenImage ? (
+                    <img src={tokenImage} alt="NFT" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-48 h-48 sm:w-64 sm:h-64 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center animate-pulse">
+                        <Sparkles className="w-16 h-16 sm:w-24 sm:h-24 text-white/70" />
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
                     <Badge className="bg-black/50 text-white border-white/20 text-xs sm:text-sm">
-                      #{Math.floor(Math.random() * 10000)}
+                      #{tokenId ?? Math.floor(Math.random() * 10000)}
                     </Badge>
                   </div>
                   <div className="absolute top-3 right-3 sm:top-4 sm:right-4">

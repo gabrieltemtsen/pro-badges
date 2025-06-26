@@ -140,7 +140,7 @@ export default function Demo(
       }, 300);
 
       const hash = await writeContractAsync({
-        address: NFT_CONTRACT,
+        address: NFT_CONTRACT  as `0x${string}`,
         abi: [
           {
             inputs: [{ internalType: 'uint256', name: 'quantity', type: 'uint256' }],
